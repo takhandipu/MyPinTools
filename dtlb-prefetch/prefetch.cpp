@@ -15,8 +15,11 @@
  */
 
 #include <iostream>
+#include <string.h>
+#include <cstdlib>
 
 #include "pin.H"
+
 
 typedef UINT64 CACHE_STATS; // type of cache hit/miss counters
 UINT64 total_ins_count=0;
@@ -24,13 +27,13 @@ UINT64 hit_miss_count[2]={0,0};
 UINT64 prefetch_hit_miss_count[2]={0,0};
 PIN_LOCK pinLock;
 PIN_LOCK insLock;
+char valid_prefetch_mode[] = "bns";
+char prefetch_mode = 'b';
 
 #include "pin_cache.H"
 
 #define IP_TRACKER_COUNT 64
 #define PREFETCH_DEGREE 1
-
-bool stride_enable = true; //false;
 
 namespace DTLB
 {
@@ -75,6 +78,12 @@ void stride_initialize()
 {
     for (int i=0; i<IP_TRACKER_COUNT; i++)
         trackers[i].lru = i;
+}
+
+void nextline_prefetch(uint64_t addr)
+{
+  bool hit = dtlb.AccessSingleLine(addr+DTLB::lineSize, CACHE_BASE::ACCESS_TYPE_LOAD);
+  prefetch_hit_miss_count[hit]++;
 }
 
 void stride_prefetch(uint64_t addr, uint64_t ip)
@@ -173,8 +182,8 @@ void stride_prefetch(uint64_t addr, uint64_t ip)
 LOCALFUN VOID Fini(int code, VOID * v)
 {
     //std::cerr << itlb;
-    std::cerr << "my_hit,my_miss,pf_hit,pf_miss,cache_hit,cache_miss,inscount\n";
-    std::cerr << hit_miss_count[1]<<","<<hit_miss_count[0]<<","<<prefetch_hit_miss_count[1]<<","<<prefetch_hit_miss_count[0]<<","<<dtlb.Hits()<<","<<dtlb.Misses()<<","<<total_ins_count<<"\n";
+    std::cerr << "prefetch_mode,my_hit,my_miss,pf_hit,pf_miss,cache_hit,cache_miss,inscount\n";
+    std::cerr <<prefetch_mode<<","<< hit_miss_count[1]<<","<<hit_miss_count[0]<<","<<prefetch_hit_miss_count[1]<<","<<prefetch_hit_miss_count[0]<<","<<dtlb.Hits()<<","<<dtlb.Misses()<<","<<total_ins_count<<"\n";
     /*UINT64 misses =  hit_miss_count[0]; //dtlb.Misses();
     UINT64 prefetch_misses = prefetch_hit_miss_count[0];
     UINT64 cache_misses = dtlb.Misses();
@@ -201,9 +210,10 @@ LOCALFUN VOID MemRef(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessTy
     PIN_GetLock(&pinLock, 0);
     bool hit = dtlb.AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
     hit_miss_count[hit]++;
-    if(!hit && stride_enable)
+    if(!hit && prefetch_mode != 'b')
     {
-        stride_prefetch(addr, ip);
+        if(prefetch_mode=='s')stride_prefetch(addr, ip);
+	if(prefetch_mode=='n')nextline_prefetch(addr);
     }
     PIN_ReleaseLock(&pinLock);
 
@@ -247,10 +257,33 @@ LOCALFUN VOID Instruction(INS ins, VOID *v)
 
 GLOBALFUN int main(int argc, char *argv[])
 {
+    if(const char *test=std::getenv("PREFETCH_MODE"))
+    {
+      prefetch_mode = test[0];
+      bool is_found = false;
+      int length=strlen(valid_prefetch_mode);
+      for(int i=0;i<length;i++)
+      {
+        if(valid_prefetch_mode[i]==prefetch_mode)
+	{
+          is_found=true;
+	  break;
+	}
+      }
+      if(!is_found)
+      {
+        std::cerr<<"Invalid TLB prefetching mode\n";
+	return -1;
+      }
+    }
+    else
+    {
+      prefetch_mode = 'b';
+    }
     PIN_InitLock(&pinLock);
     PIN_InitLock(&insLock);
     PIN_Init(argc, argv);
-    stride_initialize();
+    if(prefetch_mode=='s')stride_initialize();
 
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
