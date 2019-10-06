@@ -32,8 +32,8 @@ total_miss_count=0
 for i in range(MAX_DIST+2):
     total_miss_count+=count[i]
 running_count=0
-print total_miss_count, total_ins_count, (1000.0*total_miss_count)/total_ins_count
+print total_miss_count, ",", total_ins_count, ",", (1000.0*total_miss_count)/total_ins_count
 for i in range(MAX_DIST+2):
     running_count+=count[i]
-    if count[i]!=0:
-        print i,(1.0*running_count/total_miss_count),count[i]
+    #if count[i]!=0:
+    print i,",",(1.0*running_count/total_miss_count),",",count[i]
