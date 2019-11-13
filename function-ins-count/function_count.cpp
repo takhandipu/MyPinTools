@@ -25,7 +25,10 @@ VOID Trace(TRACE trace, VOID *v)
   {
     RTN tmp = INS_Rtn(BBL_InsHead(bbl));
     string name = "Unknown";
-    if(RTN_Valid(tmp))name=RTN_Name(tmp);
+    if(RTN_Valid(tmp))
+    {
+      name=IMG_Name(SEC_Img(RTN_Sec(tmp)));      
+    }
     UINT32 index;
     if(func_name_to_index.find(name)==func_name_to_index.end())
     {
