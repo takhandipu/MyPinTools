@@ -6,7 +6,7 @@
 
 using namespace std;
 
-static UINT32 current_index = 0;
+UINT32 current_index = 0;
 
 map<string,UINT32> func_name_to_index;
 map<UINT32,UINT64> func_count;
@@ -20,22 +20,23 @@ VOID PIN_FAST_ANALYSIS_CALL docount(UINT32 c,UINT32 index)
 
 VOID Trace(TRACE trace, VOID *v)
 {
-  RTN tmp = TRACE_Rtn(trace);
-  string name = "Unknown";
-  if(RTN_Valid(tmp))name=RTN_Name(tmp);
-  UINT32 index;
-  if(func_name_to_index.find(name)==func_name_to_index.end())
-  {
-    func_name_to_index[name]=current_index;
-    index=current_index;
-    current_index++;
-  }
-  else
-  {
-    index = func_name_to_index[name];
-  }
+  
   for(BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl=BBL_Next(bbl))
   {
+    RTN tmp = INS_Rtn(BBL_InsHead(bbl));
+    string name = "Unknown";
+    if(RTN_Valid(tmp))name=RTN_Name(tmp);
+    UINT32 index;
+    if(func_name_to_index.find(name)==func_name_to_index.end())
+    {
+      func_name_to_index[name]=current_index;
+      index=current_index;
+      current_index++;
+    }
+    else
+    {
+      index = func_name_to_index[name];
+    }
     BBL_InsertCall(bbl, IPOINT_ANYWHERE, (AFUNPTR)docount, IARG_FAST_ANALYSIS_CALL, IARG_UINT32, BBL_NumIns(bbl), IARG_UINT32, index, IARG_END);
   }
 }
